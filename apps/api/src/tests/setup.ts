@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 // Wipe user-owned tables before every test so tests never leak state into
 // each other. Order matters: children before parents.
 const TABLES = [
+  "lexia_firms",
   "audit_log",
   "ai_actions",
   "ai_conversations",

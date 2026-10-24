@@ -29,6 +29,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.32.1
         version: 0.32.1
+      '@nexus/lexia':
+        specifier: workspace:*
+        version: link:../../packages/lexia
       '@nexus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -261,6 +264,22 @@ importers:
       prisma:
         specifier: ^6.19.3
         version: 6.19.3(typescript@6.0.3)
+
+  packages/lexia:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.4
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.4)(lightningcss@1.33.0)(terser@5.51.2)
 
   packages/shared:
     dependencies:

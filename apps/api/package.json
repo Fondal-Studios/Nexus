@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@nexus/lexia": "workspace:*",
     "@nexus/shared": "workspace:*",
     "@nexus/verticals": "workspace:*",
     "@prisma/client": "^6.19.3",

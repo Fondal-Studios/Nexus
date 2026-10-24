@@ -9,3 +9,4 @@ export * from "./preferences";
 export * from "./memory";
 export * from "./clinical";
 export * from "./googleWorkspace";
+export * from "./lexia";

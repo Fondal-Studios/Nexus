@@ -53,6 +53,7 @@ model User {
   clinicalEncounters    ClinicalEncounter[]
   clinicalFollowups     ClinicalFollowup[]
   clinicalTemplates     ClinicalTemplate[]
+  lexiaMemberships      LexMember[]
 
   @@map("users")
 }
@@ -705,4 +706,194 @@ model ClinicalTemplate {
   @@unique([userId, clientId])
   @@index([userId])
   @@map("clinical_templates")
+}
+
+// ---------------------------------------------------------------------------
+// LEXIA — legal practice management (see docs/lexia/). Every row belongs to a
+// firm (tenant). Personal data and reserved notes live in `recordEncrypted`
+// (AES-256-GCM, AAD bound to firm + kind + id); only structural fields used
+// for filtering and isolation stay in clear columns.
+// ---------------------------------------------------------------------------
+
+model LexFirm {
+  id        String   @id @default(uuid())
+  name      String
+  // Firm-level AI policy: external providers stay off until explicitly enabled.
+  externalAiEnabled Boolean  @default(false)
+  allowedAiRegions  String[]
+  createdAt DateTime @default(now())
+
+  members   LexMember[]
+  clients   LexClient[]
+  matters   LexMatter[]
+  documents LexDocument[]
+  auditLogs LexAuditLog[]
+
+  @@map("lexia_firms")
+}
+
+model LexMember {
+  id         String   @id @default(uuid())
+  firmId     String
+  firm       LexFirm  @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // owner | admin | lawyer | paralegal | admin_staff | read_only
+  role       String
+  mfaEnabled Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  assignments LexMatterAssignment[]
+
+  @@unique([firmId, userId])
+  @@index([userId])
+  @@map("lexia_members")
+}
+
+model LexClient {
+  id              String   @id @default(uuid())
+  firmId          String
+  firm            LexFirm  @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  recordEncrypted String
+  searchTokens    String[]
+  version         Int      @default(1)
+  archived        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  matters LexMatter[]
+
+  @@index([firmId, archived, updatedAt])
+  @@index([searchTokens], type: Gin)
+  @@map("lexia_clients")
+}
+
+model LexMatter {
+  id              String   @id @default(uuid())
+  firmId          String
+  firm            LexFirm  @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  clientId        String
+  client          LexClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  // judicial | administrative | extrajudicial | advisory
+  kind            String
+  status          String   @default("OPEN")
+  // Reserved matters never go to external AI unless the firm opted in.
+  reserved        Boolean  @default(false)
+  filedAt         DateTime? @db.Date
+  // Normative date used to pick the law in force (defaults to the facts date).
+  normativeDate   DateTime? @db.Date
+  recordEncrypted String
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  assignments LexMatterAssignment[]
+  documents   LexDocument[]
+  deadlines   LexDeadline[]
+  tasks       LexTask[]
+  alerts      LexAlert[]
+
+  @@index([firmId, status, updatedAt])
+  @@index([clientId])
+  @@map("lexia_matters")
+}
+
+model LexMatterAssignment {
+  matterId  String
+  matter    LexMatter @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    LexMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  // responsible | collaborator
+  capacity  String    @default("collaborator")
+
+  @@id([matterId, memberId])
+  @@map("lexia_matter_assignments")
+}
+
+model LexDocument {
+  id          String   @id @default(uuid())
+  firmId      String
+  firm        LexFirm  @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  matterId    String
+  matter      LexMatter @relation(fields: [matterId], references: [id], onDelete: Restrict)
+  // firm | restricted | client_visible
+  visibility  String   @default("firm")
+  docType     String?
+  // Private object storage key; never a public URL.
+  storageKey  String
+  sha256      String
+  sizeBytes   Int
+  mimeType    String
+  // Extracted text, encrypted; null until OCR/extraction ran.
+  textEncrypted String?
+  version     Int      @default(1)
+  previousVersionId String?
+  createdAt   DateTime @default(now())
+
+  @@index([firmId, matterId])
+  @@map("lexia_documents")
+}
+
+model LexDeadline {
+  id          String   @id @default(uuid())
+  matterId    String
+  matter      LexMatter @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  title       String
+  dueDate     DateTime? @db.Date
+  // estimated | calculated | confirmed | insufficient_data
+  status      String
+  basis       Json     @default("{}")
+  confirmedById String?
+  confirmedAt DateTime?
+  done        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([matterId, done, dueDate])
+  @@map("lexia_deadlines")
+}
+
+model LexTask {
+  id         String   @id @default(uuid())
+  matterId   String
+  matter     LexMatter @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  title      String
+  assigneeId String?
+  dueDate    DateTime? @db.Date
+  done       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([matterId, done])
+  @@map("lexia_tasks")
+}
+
+model LexAlert {
+  id            String   @id
+  matterId      String
+  matter        LexMatter @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  rule          String
+  priority      String
+  payload       Json
+  // unreviewed | confirmed | dismissed
+  reviewStatus  String   @default("unreviewed")
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([matterId, reviewStatus])
+  @@map("lexia_alerts")
+}
+
+model LexAuditLog {
+  id         String   @id @default(uuid())
+  firmId     String
+  firm       LexFirm  @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  actorId    String
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([firmId, createdAt])
+  @@map("lexia_audit_log")
 }

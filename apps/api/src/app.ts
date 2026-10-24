@@ -20,6 +20,7 @@ import { tasksRouter } from "./routes/tasks.js";
 import { todayRouter } from "./routes/today.js";
 import { googleWorkspaceRouter } from "./routes/googleWorkspace.js";
 import { clinicalRouter } from "./routes/clinical.js";
+import { lexiaRouter } from "./routes/lexia.js";
 import { verticalsRouter } from "./routes/verticals.js";
 import { voiceRouter } from "./routes/voice.js";
 
@@ -68,6 +69,7 @@ export function createApp() {
   app.use("/quick-capture", quickCaptureRouter);
   app.use("/today", todayRouter);
   app.use("/clinical", clinicalRouter);
+  app.use("/lexia", lexiaRouter);
   app.use("/verticals", verticalsRouter);
   app.use("/voice", voiceRouter);
   app.use("/google-workspace", googleWorkspaceRouter);
